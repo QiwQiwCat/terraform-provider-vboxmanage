@@ -1,4 +1,4 @@
-module github.com/apriliantocecep/terraform-provider-vboxmanage
+module github.com/QiwQiwCat/terraform-provider-vboxmanage
 
 go 1.24.2
 

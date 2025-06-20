@@ -5,7 +5,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/apriliantocecep/terraform-provider-vboxmanage/internal/provider"
+	"github.com/QiwQiwCat/terraform-provider-vboxmanage/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
