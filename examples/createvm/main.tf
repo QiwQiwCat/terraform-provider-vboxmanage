@@ -9,9 +9,9 @@ terraform {
 provider "vboxmanage" {}
 
 resource "vboxmanage_createvm" "ubuntu" {
-  name = "ubuntu-vm"
-  cpus = 2
-  memory = 2048
+  name = "ubuntu-vm-64"
+  cpus = 3
+  memory = 4048
 }
 
 output "vm_ubuntu" {

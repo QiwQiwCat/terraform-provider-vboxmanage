@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"strconv"
 )
 
 var (
@@ -143,9 +144,105 @@ func (r *createvmResource) Read(ctx context.Context, request resource.ReadReques
 }
 
 func (r *createvmResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	// Retrieve values from plan
+	var plan createvmResourceModel
+	diags := request.Plan.Get(ctx, &plan)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	vmUuid := plan.UUID.ValueString()
+
+	vmName := plan.Name.ValueString()
+	if err := RunVBoxManage("modifyvm", vmUuid, "--name", vmName); err != nil {
+		response.Diagnostics.AddError(
+			"Error updating VM Name",
+			"Could not update virtual machine name, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	vmMemory := plan.Memory.ValueInt64()
+	if err := RunVBoxManage("modifyvm", vmUuid, "--memory", fmt.Sprintf("%d", vmMemory)); err != nil {
+		response.Diagnostics.AddError(
+			"Error updating VM Memory",
+			"Could not update virtual machine memory, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	vmCpus := plan.Cpus.ValueInt32()
+	if err := RunVBoxManage("modifyvm", vmUuid, "--cpus", fmt.Sprintf("%d", vmCpus)); err != nil {
+		response.Diagnostics.AddError(
+			"Error updating VM CPUs",
+			"Could not update virtual machine CPUs, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// refresh state
+	output, err := RunVBoxManageWithOutput("showvminfo", vmUuid, "--machinereadable")
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Error reading VM",
+			"Could not read virtual machine information, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Parse the output to get the UUID and other details
+	vmInfo := ParseShowVMInfo(output)
+
+	// Overwrite data with refreshed state
+	integerValueCpus, err := strconv.Atoi(GetVMInfoFromOutput(vmInfo, "cpus"))
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Error parsing CPUs",
+			"Could not parse CPUs from virtual machine information, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	integerValueMemory, err := strconv.Atoi(GetVMInfoFromOutput(vmInfo, "memory"))
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Error parsing Memory",
+			"Could not parse Memory from virtual machine information, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	cpus := int32(integerValueCpus)
+	memory := int64(integerValueMemory)
+
+	plan.Name = types.StringValue(GetVMInfoFromOutput(vmInfo, "name"))
+	plan.Cpus = types.Int32Value(cpus)
+	plan.Memory = types.Int64Value(memory)
+
+	diags = response.State.Set(ctx, plan)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (r *createvmResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	// Retrieve values from state
+	var state createvmResourceModel
+	diags := request.State.Get(ctx, &state)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	if err := RunVBoxManage("unregistervm", state.UUID.ValueString(), "--delete-all"); err != nil {
+		response.Diagnostics.AddError(
+			"Error deleting VM",
+			"Could not delete virtual machine, unexpected error: "+err.Error(),
+		)
+		return
+	}
 }
 
 func NewCreateVmResource() resource.Resource {
