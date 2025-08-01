@@ -2,7 +2,7 @@ module github.com/QiwQiwCat/terraform-provider-vboxmanage
 
 go 1.24.2
 
-require github.com/hashicorp/terraform-plugin-framework v1.15.0
+require github.com/hashicorp/terraform-plugin-framework v1.15.1
 
 require (
 	github.com/fatih/color v1.16.0 // indirect
